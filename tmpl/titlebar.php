@@ -2,7 +2,7 @@
     <div class="container-fluid">
         <a class="navbar-brand" href="#">
         <span class="brand-button bg-dark">
-            <img src="<?php echo !empty(user::$hersteller_logo) ? user::$hersteller_logo : 'css/logo_w.png' ?>"
+            <img src="<?php echo !empty(user::$hersteller_logo) ? user::$hersteller_logo : 'css/img/logo/logo_w.png' ?>"
                  alt="<?php echo user::$hersteller_name ?>"
                  width="auto"
                  height="24"/>

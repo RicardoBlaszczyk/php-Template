@@ -14,7 +14,7 @@ $currentUrl = "$scheme://$host$uri";
 <nav class="navbar second-navbar fixed-top navbar-expand-lg bg-body-tertiary">
     <div class="container-fluid">
         <a class="btn btn-sm btn-secondary" href="index.php">
-            <img src="css/logo_w.png" alt="KaiTech IT-Systems" width="auto" height="24"/></a>
+            <img src="css/img/logo/logo_w.png" alt="KaiTech IT-Systems" width="auto" height="24"/></a>
         <button class="navbar-toggler"
                 type="button"
                 data-bs-toggle="collapse"

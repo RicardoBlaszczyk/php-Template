@@ -437,11 +437,5 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
 </section>
 <section class="content-footer"></section>
 <?php include 'tmpl/foot.php' ?>
-<script type="text/javascript">
-    var msnry = new Masonry('#cards-row', {
-        itemSelector: '.col',
-        percentPosition: true
-    });
-</script>
 </body>
 </html>
