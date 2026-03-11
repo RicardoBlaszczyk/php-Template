@@ -1,0 +1,49 @@
+name: "release-with-changelog"
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # WICHTIG: Lädt die gesamte Historie für das Changelog
+
+      # Generiere Changelog aus Commits
+      - name: Generate changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ignorePreReleases: false
+          commitMode: true  # Fallback wenn keine Tags da sind
+          configurationJson: |
+            {
+               "template": "# Changelog\n\n${CHANGELOG}\n\n## Commits\n\n${COMMITS}",
+               "categories": [
+                 {
+                   "title": "## 🚀 Features",
+                   "labels": ["feature"]
+                 }
+               ],
+               "unmapped_resolved_title": "## 🛠 Other Changes",
+               "commit_template": "- ${MESSAGE} (${HASH})",
+               "max_commits": 100,
+               "include_commits": true,
+               "next_tag": "${{ github.ref_name }}"
+             }
+
+      # GitHub Release erstellen
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: ${{ steps.changelog.outputs.changelog }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+        env:
+         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
