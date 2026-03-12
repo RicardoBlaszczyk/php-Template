@@ -159,6 +159,88 @@ function safefilerewrite($fileName, $dataToSave)
 }
 
 /**
+ * @param $databaseInfo
+ *
+ * @return array|false|DbConnector
+ */
+/**
+ * @param $databaseInfo
+ *
+ * @return array|false|DbConnector
+ */
+function checkDb($databaseInfo)
+{
+    $errors = [];
+    try {
+        $sqlErrors  = null;
+        $connection = false;
+        switch ($databaseInfo['typ']) {
+            case DbConnector::CONNECTION_MSSQL:
+                $connection = new MssqlConnector(
+                    $databaseInfo['server'],
+                    $databaseInfo['db'],
+                    $databaseInfo['user'],
+                    $databaseInfo['pass'],
+                    $databaseInfo['port'] ?? null
+                );
+                $sqlErrors = sqlsrv_errors(SQLSRV_ERR_ERRORS);
+                if (!empty($sqlErrors)) {
+                    $errors[] = "<pre>" . print_r($sqlErrors, true) . "</pre>";
+                }
+                break;
+
+            case DbConnector::CONNECTION_MYSQL:
+                $connection = new MysqlConnector(
+                    $databaseInfo['server'],
+                    $databaseInfo['db'],
+                    $databaseInfo['user'],
+                    $databaseInfo['pass'],
+                    $databaseInfo['port'] ?? null
+                );
+                $sqlErrors = mysqli_connect_error();
+                if (!empty($sqlErrors)) {
+                    $errors[] = "<pre>" . $sqlErrors . "</pre>";
+                }
+                break;
+
+            case DbConnector::CONNECTION_ODBC:
+                if (!class_exists('OdbcConnector')) {
+                    include_once dirname(__FILE__) . '/db/OdbcConnector.php';
+                }
+
+                $connection = new OdbcConnector(
+                    $databaseInfo['server'],
+                    $databaseInfo['db'],
+                    $databaseInfo['user'],
+                    $databaseInfo['pass']
+                );
+                $sqlErrors = odbc_errormsg();
+                if (!empty($sqlErrors)) {
+                    $errors[] = "<pre>" . $sqlErrors . "</pre>";
+                }
+                break;
+
+            default:
+                $errors[] = "Kein gültiger DB Typ im Setup angegeben: " . ($databaseInfo['typ'] ?? '');
+        }
+
+        if ($connection === false) {
+            $errors[] = "Fehler bei DB Verbindung";
+        }
+    } catch (DatabaseException $e) {
+        $errors[] = "Fehler bei DB Verbindung: <br><pre>" . print_r($e->getDatabaseError(), true) . "</pre>";
+    } catch (Exception $e) {
+        $errors[] = "Fehler bei DB Verbindung: " . $e->getMessage();
+    }
+
+    if (empty($errors) && !empty($connection)) {
+        return $connection;
+    }
+
+    return $errors;
+}
+
+/**
  * @param $filePath
  *
  * @return array|false

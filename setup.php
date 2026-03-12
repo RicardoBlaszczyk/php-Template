@@ -19,7 +19,7 @@ define('ROOT', __DIR__ . DIRECTORY_SEPARATOR);
 define('PROJECT_PATH', basename(__DIR__));
 define('PROJECT_NAME', basename(__DIR__));
 define('VERSION_NR', 'Setup');
-session_name("SCANHUBSETUP");
+session_name("INSTALLSETUP");
 session_start();
 
 /**
@@ -53,6 +53,26 @@ include_once ROOT . "inc/class_config.php";
 include_once ROOT . "inc/class_notification.php";
 include_once ROOT . "inc/class_log.php";
 
+if (($_GET['action'] ?? '') === 'check_db') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $databaseInfo = $_POST['mssql'] ?? [];
+    $checkDb      = checkDb($databaseInfo);
+
+    if ($checkDb !== false && !is_array($checkDb)) {
+        echo json_encode([
+                                 'success' => true,
+                                 'message' => 'Datenbankverbindung erfolgreich hergestellt.'
+                         ], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo json_encode([
+                                 'success' => false,
+                                 'message' => is_array($checkDb) ? implode('<br>', $checkDb) : 'Verbindung fehlgeschlagen.'
+                         ], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
 /**
  * Setup-Defaults laden (nur für setup.php):
  * - liest sicher/ini/default.ini
@@ -71,7 +91,7 @@ if (is_file($defaultIni)) {
             }
             foreach ($values as $k => $v) {
                 if (!array_key_exists($k, $_POST[$section]) || $_POST[$section][$k] === '' || $_POST[$section][$k] === null) {
-                    $_POST[$section][str_replace($section.'_', '', strtolower($k))] = $v;
+                    $_POST[$section][str_replace($section . '_', '', strtolower($k))] = $v;
                 }
             }
         }
@@ -115,7 +135,7 @@ $breadcrumbs = [
         ['title' => 'Setup', 'url' => 'setup.php']
 ];
 
-switch($action) {
+switch ($action) {
     case 'update':
         if (!empty($_POST)) {
             foreach ($mandatory as $fieldGroup => $fields) {
@@ -204,49 +224,6 @@ switch($action) {
         break;
 }
 
-/**
- * @param $databaseInfo
- *
- * @return array|false|DbConnector
- */
-function checkDb($databaseInfo)
-{
-    $errors = [];
-    try {
-        $sqlErrors  = null;
-        $connection = false;
-        switch ($databaseInfo['typ']) {
-            case DbConnector::CONNECTION_MSSQL:
-                $connection = $connection = new MssqlConnector($databaseInfo['server'], $databaseInfo['db'], $databaseInfo['user'], $databaseInfo['pass'], $databaseInfo['port']);
-                $sqlErrors  = sqlsrv_errors(SQLSRV_ERR_ERRORS);
-                if (!empty($sqlErrors)) {
-                    $errors[] = "<pre>" . print_r($sqlErrors, true) . "</pre>";
-                }
-                break;
-            case DbConnector::CONNECTION_MYSQL:
-                $connection = new MysqlConnector($databaseInfo['server'], $databaseInfo['db'], $databaseInfo['user'], $databaseInfo['pass'], $databaseInfo['port']);
-                $sqlErrors  = mysqli_connect_error();
-                if (!empty($sqlErrors)) {
-                    $errors[] = "<pre>" . $sqlErrors . "</pre>";
-                }
-                break;
-            default:
-                $errors[] = "Kein gültiger DB Typ im Setup angegeben: " . $databaseInfo['typ'];
-        }
-        if ($connection === false) {
-            $errors[] = "Fehler bei DB Verbindung";
-        }
-    } catch (DatabaseException $e) {
-        $errors[] = "Fehler bei DB Verbindung: <br><pre>" . print_r($e->getDatabaseError(), true) . "</pre>";
-    } catch (Exception $e) {
-        $errors[] = "Fehler bei DB Verbindung: " . $e->getMessage();
-    }
-    if (empty($errors) && !empty($connection)) {
-        return $connection;
-    }
-
-    return $errors;
-}
 
 ?>
 <!doctype html>
@@ -269,39 +246,67 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
             <div class="row row-cols-1 row-cols-md-3 g-4">
                 <div class="col">
                     <div class="card mt-3 card-1-1">
-                        <div class="card-header bg-dark text-white">System</div>
+                        <div class="card-header bg-dark text-white">
+                            <h4 class="modal-title">System</h4>
+                        </div>
                         <div class="card-body">
                             <p><strong>Grundlegende Systemeinstellungen</strong></p>
                             <div class="mb-3">
                                 <label class="form-label" for="project_name">Projekt-Name</label>
-                                <input type="text" class="form-control" id="project_name" name="project[name]"
-                                       value="<?php echo $_POST['project']['name'] ?? PROJECT_NAME ?>">
+                                <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-terminal"></i></span>
+                                    <input type="text" class="form-control" id="project_name" name="project[name]"
+                                           value="<?php echo $_POST['project']['name'] ?? PROJECT_NAME ?>">
+                                </div>
+                                <div class="form-text">Der Projektname wird für die Titelleiste verwendet.</div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label" for="version_nr">Version</label>
-                                <input type="text" class="form-control" id="version_nr" name="version[nr]"
-                                       value="<?php echo $_POST['version']['nr'] ?? VERSION_NR ?>" readonly>
+                                <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-tag"></i></span>
+                                    <input type="text" class="form-control" id="version_nr" name="version[nr]"
+                                           value="<?php echo $_POST['version']['nr'] ?? VERSION_NR ?>" readonly>
+                                </div>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label" for="project_path">Projekt-Pfad</label>
-                                <input type="text" class="form-control" id="project_path" name="project[path]"
-                                       value="<?php echo $_POST['project']['path'] ?? PROJECT_PATH ?>">
+                                <label class="form-label" for="project_path">Pfad relativ zum Webserver-Root</label>
+                                <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-bookmark-o"></i></span>
+                                    <input type="text" class="form-control" id="project_path" name="project[path]"
+                                           value="<?php echo $_POST['project']['path'] ?? PROJECT_PATH ?>">
+                                </div>
+                                <div class="form-text">Gib den Projektpfad relativ zum Webserver-Root an, z. B.
+                                    /projektname.
+                                </div>
+                            </div>
+                            <div class="mb-5">
+                                <label class="form-label" for="project_root">Server-Root</label>
+                                <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-folder-open-o"></i></span>
+
+                                    <input type="text" class="form-control" id="project_root" name="project[root]"
+                                           value="<?php echo $_POST['project']['root'] ?? ROOT ?>" readonly>
+                                </div>
+                                <div class="form-text">Der Server-Root wird automatisch ermittelt.</div>
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label" for="project_root">Server-Root</label>
-                                <input type="text" class="form-control" id="project_root" name="project[root]"
-                                       value="<?php echo $_POST['project']['root'] ?? ROOT ?>" readonly>
-                            </div>
-                            <hr/>
                             <?php if (is_file($defaultIni)) { ?>
-                                <p>Zeigt die Default-Konfiguration aus <code>sicher/ini/default.ini</code></p>
+                                <p><strong>Default-Konfiguration</strong></p>
+                                <p>Zeigt die Default-Konfiguration aus <code>default.ini</code> an, sofern die Datei
+                                    vorhanden ist.</p>
                                 <div class="mb-3">
                                     <a href="#"
-                                       class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
+                                       class="btn btn-outline-secondary btn-sm mb-3" data-bs-toggle="modal"
                                        data-bs-target="#defaultIniModal">
-                                        Default-Konfiguration
+                                        Default-Konfiguration anzeigen
                                     </a>
+                                    <div class="form-text">Wird nur geladen, wenn die Datei
+                                        <code>sicher/ini/default.ini</code> vorhanden ist.
+                                    </div>
                                 </div>
                                 <?php
                                 include 'tmpl/modal/setup_default_configuration.php';
@@ -312,106 +317,210 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
                 </div>
                 <div class="col">
                     <div class="card mt-3 card-1-1">
-                        <div class="card-header bg-dark text-white">SQL-Server Verbindungsangaben</div>
+                        <div class="card-header bg-dark text-white">
+                            <h4 class="modal-title">SQL-Server Verbindungsangaben</h4>
+                        </div>
                         <div class="card-body">
                             <p><strong>Einstellung der Verbindung zu Datenbank.</strong></p>
+                            <!-- Basic switch -->
+                            <div class="form-check form-switch mb-3">
+                                <!-- Fallback: wird gesendet, wenn Checkbox nicht angehakt -->
+                                <input type="hidden" name="mssql[use]"
+                                       value="0">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="mssql_use"
+                                       name="mssql[use]"
+                                       value="<?php echo !empty($_POST['mssql']['use']) ? 1 : 0; ?>"
+                                        <?php echo !empty($_POST['mssql']['use']) ? 'checked' : ''; ?>
+                                       onclick="this.value = this.checked ? 1 : 0;"/>
+                                <label class="form-check-label"
+                                       for="mssql_use">Datenbankverbindung nutzen</label>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label" for="mssql_typ">Verbindung zu Datenbanktyp<span
-                                            class="text-danger">*</span></label>
-                                <select class="form-select" id="mssql_typ" name="mssql[typ]">
-                                    <option value="MSSQL" <?php echo $_POST['mssql']['typ'] ?? 'MSSQL' ? 'selected' : '' ?>>
-                                        MS-SQL
-                                    </option>
-                                    <option value="MYSQL" <?php echo $_POST['mssql']['typ'] ?? 'MYSQL' ? 'selected' : '' ?>>
-                                        MySQL/MariaDB
-                                    </option>
-                                </select>
+                                            class="text-danger">*</span></label><br/>
+
+                                <?php $selectedType = $_POST['mssql']['typ'] ?? 'MSSQL'; ?>
+
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="mssql[typ]"
+                                       id="mssql-typ-mssql"
+                                       value="MSSQL" autocomplete="off"
+                                        <?php echo $selectedType === 'MSSQL' ? 'checked' : ''; ?>>
+                                <label class="btn btn-outline-secondary" for="mssql-typ-mssql">MSSQL</label>
+
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="mssql[typ]"
+                                       id="mssql-typ-mysql"
+                                       value="MYSQL"
+                                       autocomplete="off"
+                                        <?php echo $selectedType === 'MYSQL' ? 'checked' : ''; ?>>
+                                <label class="btn btn-outline-secondary" for="mssql-typ-mysql">MySQL/MariaDB</label>
+
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="mssql[typ]"
+                                       id="mssql-typ-odbc"
+                                       value="ODBC"
+                                       autocomplete="off"
+                                        <?php echo $selectedType === 'ODBC' ? 'checked' : ''; ?>>
+                                <label class="btn btn-outline-secondary" for="mssql-typ-odbc">ODBC</label>
+
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="mssql_server">Server<span
-                                            class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="mssql_server" name="mssql[server]" required
-                                       placeholder="SERVER/INSTANZ"
-                                       value="<?php echo $_POST['mssql']['server'] ?? '' ?>">
+                            <div class="row mb-3">
+                                <div class="col-9">
+                                    <label class="form-label" for="mssql_server">Server<span
+                                                class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-server"></i></span>
+                                        <input type="text" class="form-control" id="mssql_server" name="mssql[server]"
+                                               required
+                                               placeholder="SERVER/INSTANZ"
+                                               value="<?php echo $_POST['mssql']['server'] ?? '' ?>">
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <label class="form-label" for="mssql_port">Port<br></label>
+                                    <input type="text" class="form-control" id="mssql_port" name="mssql[port]"
+                                           placeholder="1433" value="<?php echo $_POST['mssql']['port'] ?? '' ?>">
+                                </div>
+                                <div class="form-text">Standardwerte Post: 1433 (MSSQL) /
+                                    3306
+                                    (Mysql)
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="mssql_port">Port<br><small>Standardwerte: 1433 (MSSQL) /
-                                        3306
-                                        (Mysql)</small></label>
-                                <input type="text" class="form-control" id="mssql_port" name="mssql[port]"
-                                       placeholder="1433" value="<?php echo $_POST['mssql']['port'] ?? '' ?>">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label" for="mssql_user">Datenbank-Benutzer<span
+                                                class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-user"></i></span>
+                                        <input type="text" class="form-control" id="mssql_user" name="mssql[user]"
+                                               required
+                                               placeholder="sa" value="<?php echo $_POST['mssql']['user'] ?? '' ?>">
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label" for="mssql_pass">Datenbank-Passwort<span
+                                                class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="mssql_pass" name="mssql[pass]"
+                                           required
+                                           value="<?php echo $_POST['mssql']['pass'] ?? '' ?>">
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="mssql_user">Benutzer<span
-                                            class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="mssql_user" name="mssql[user]" required
-                                       placeholder="sa" value="<?php echo $_POST['mssql']['user'] ?? '' ?>">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="mssql_pass">Passwort<span
-                                            class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="mssql_pass" name="mssql[pass]" required
-                                       value="<?php echo $_POST['mssql']['pass'] ?? '' ?>">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="mssql_db">Datenbank<span
-                                            class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="mssql_db" name="mssql[db]" required
-                                       placeholder="DATENBANK" value="<?php echo $_POST['mssql']['db'] ?? '' ?>">
+                            <div class="row mb-3">
+                                <div class="col-8">
+                                    <label class="form-label" for="mssql_db">Datenbank<span
+                                                class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-database"></i></span>
+                                        <input type="text" class="form-control" id="mssql_db" name="mssql[db]" required
+                                               placeholder="DATENBANK"
+                                               value="<?php echo $_POST['mssql']['db'] ?? '' ?>">
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label">&nbsp;
+                                        <input type="hidden" id="mssql_check" name="mssql[check]" required
+                                               value="<?php echo $_POST['mssql']['check'] ?? 'error' ?>">
+                                    </label><br/>
+                                    <button type="button" id="mssql_check_btn" class="btn btn-outline-secondary w-100">
+                                        Verbindung prüfen
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="col">
                     <div class="card mt-3 card-1-1">
-                        <div class="card-header bg-dark text-white">Kundeninfo</div>
+                        <div class="card-header bg-dark text-white">
+                            <h4 class="modal-title">Kundeninfo</h4>
+                        </div>
                         <div class="card-body">
                             <p><strong>Installation für Kunden</strong></p>
+
                             <input type="hidden" name="company[number]" value="01"/>
                             <input type="hidden" name="branch[number]" value="01"/>
-                            <div class="mb-3">
-                                <label class="form-label" for="company_account">Kundennummer<span
-                                            class="text-danger">*</span></label>
-                                <input type="text" class="form-control"
-                                       id="company_account"
-                                       required="required"
-                                       name="company[account]"
-                                       placeholder="Kundennummer"
-                                       value="<?php echo $_POST['company']['account'] ?? '' ?>">
+
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label" for="company_account">Kundennummer<span
+                                                class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-hashtag"></i></span>
+                                        <input type="text" class="form-control"
+                                               id="company_account"
+                                               required="required"
+                                               name="company[account]"
+                                               placeholder="Kundennummer"
+                                               value="<?php echo $_POST['company']['account'] ?? '' ?>">
+                                    </div>
+                                </div>
+                                <div class="col-6">
+
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label" for="company_name">Firma<span
                                             class="text-danger">*</span></label>
-                                <input type="text" class="form-control"
-                                       id="company_name"
-                                       required="required"
-                                       name="company[name]"
-                                       placeholder="Firma"
-                                       value="<?php echo $_POST['company']['name'] ?? '' ?>">
+                                <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-industry"></i></span>
+                                    <input type="text" class="form-control"
+                                           id="company_name"
+                                           required="required"
+                                           name="company[name]"
+                                           placeholder="Firma"
+                                           value="<?php echo $_POST['company']['name'] ?? '' ?>">
+                                </div>
                             </div>
                             <div class="mb-5">
                                 <label class="form-label" for="branch_name">Filiale<span
                                             class="text-danger">*</span></label>
-                                <input type="text" class="form-control"
-                                       id="branch_name"
-                                       required="required"
-                                       name="branch[name]"
-                                       placeholder="Filiale"
-                                       value="<?php echo $_POST['branch']['name'] ?? '' ?>">
+                                <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-home"></i></span>
+                                    <input type="text" class="form-control"
+                                           id="branch_name"
+                                           required="required"
+                                           name="branch[name]"
+                                           placeholder="Filiale"
+                                           value="<?php echo $_POST['branch']['name'] ?? '' ?>">
+                                </div>
                             </div>
                             <p><strong>Login für Systemadministrator</strong></p>
-                            <div class="mb-3">
-                                <label class="form-label" for="login_user">User<span
-                                            class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="login_user" required name="login[user]"
-                                       value="<?php echo $_POST['login']['user'] ?? 'sa' ?>">
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <label class="form-label" for="login_user">Administrator<span
+                                                class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                    <span class="input-group-text input-group-text-fixed">
+                                        <i class="fa fa-user"></i></span>
+                                        <input type="text" class="form-control" id="login_user" required
+                                               name="login[user]"
+                                               value="<?php echo $_POST['login']['user'] ?? 'sa' ?>">
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="login_pass">Passwort<span
+                                                    class="text-danger">*</span></label>
+                                        <input type="password" class="form-control" id="login_pass" required
+                                               name="login[pass]"
+                                               value="<?php echo $_POST['login']['pass'] ?? '' ?>">
+                                    </div>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label" for="login_pass">Passwort<span
-                                            class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="login_pass" required name="login[pass]"
-                                       value="<?php echo $_POST['login']['pass'] ?? '' ?>">
-                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -437,5 +546,77 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
 </section>
 <section class="content-footer"></section>
 <?php include 'tmpl/foot.php' ?>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const checkButton = document.getElementById('mssql_check_btn');
+        const checkField = document.getElementById('mssql_check');
+        const useField = document.getElementById('mssql_use');
+
+        if (useField && checkField) {
+            useField.addEventListener('change', function () {
+                if (this.checked && checkField.value !== 'success') {
+                    this.checked = false;
+                    this.value = '0';
+
+                    showToast(
+                        'Bitte prüfe zuerst erfolgreich die Datenbankverbindung.',
+                        'warning',
+                        'Verbindung erforderlich'
+                    );
+                    return;
+                }
+
+                this.value = this.checked ? '1' : '0';
+            });
+        }
+
+        if (!checkButton || !checkField) {
+            return;
+        }
+
+        checkButton.addEventListener('click', async function () {
+            const originalText = checkButton.innerHTML;
+
+            const selectedType = document.querySelector('input[name="mssql[typ]"]:checked');
+            const formData = new FormData();
+
+            formData.append('mssql[typ]', selectedType ? selectedType.value : 'MSSQL');
+            formData.append('mssql[server]', document.getElementById('mssql_server')?.value || '');
+            formData.append('mssql[port]', document.getElementById('mssql_port')?.value || '');
+            formData.append('mssql[user]', document.getElementById('mssql_user')?.value || '');
+            formData.append('mssql[pass]', document.getElementById('mssql_pass')?.value || '');
+            formData.append('mssql[db]', document.getElementById('mssql_db')?.value || '');
+
+            checkButton.disabled = true;
+            checkButton.innerHTML = 'Prüfe...';
+
+            try {
+                const response = await fetch('setup.php?action=check_db', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    checkField.value = 'success';
+                    showToast('Datenbankverbindung erfolgreich hergestellt.', 'success', 'Verbindung geprüft');
+                } else {
+                    checkField.value = 'error';
+                    showToast(data.message || 'Verbindung fehlgeschlagen.', 'error', 'Verbindung fehlgeschlagen');
+                }
+            } catch (error) {
+                checkField.value = 'error';
+                showToast('Die Verbindungsprüfung konnte nicht ausgeführt werden.', 'error', 'Fehler');
+            } finally {
+                checkButton.disabled = false;
+                checkButton.innerHTML = originalText;
+            }
+        });
+    });
+</script>
 </body>
 </html>

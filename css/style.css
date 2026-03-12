@@ -1119,3 +1119,15 @@ opacity: 0.5;
     cursor: pointer;
     transition: background-color 0.2s ease-in-out;
 }
+
+.input-icon-fixed {
+    width: 42px;
+    justify-content: center;
+}
+
+.input-group-text-fixed {
+    width: 42px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
