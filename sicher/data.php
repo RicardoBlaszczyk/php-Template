@@ -176,6 +176,11 @@ $arr_system = array();
 foreach ($arr_config as $cfg) {
     $arr_system[$cfg['key']] = $cfg['value'];
 }
+foreach ($arr_system as $key => $value) {
+    if (!defined($key)) {
+        define($key, $value);
+    }
+}
 
 // ------------------------------------------------------------
 // Klassen dynamisch laden

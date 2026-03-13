@@ -55,8 +55,8 @@ class config
             array(
                 'title'       => 'Interface Benutzer hinzufügen',
                 'description' => 'Hinzufügen eines Interface Benutzers',
-                'modal'       => 'interfaceAddUser',
-                'ident'       => 'interfaceUser',
+                'modal'       => 'config_user_add',
+                'ident'       => 'interfaceAddUser',
             ),
             array(
                 'title'       => 'IP-Räume für Benutzer',
