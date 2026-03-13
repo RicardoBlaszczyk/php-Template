@@ -51,8 +51,12 @@ if (!empty($jwt_token)) {
     try {
         // JWT Library laden (falls nicht bereits durch andere Includes geladen)
         if (!class_exists('\\Firebase\\JWT\\JWT') || !class_exists('\\Firebase\\JWT\\Key')) {
-            $jwtAutoload = __DIR__ . DIRECTORY_SEPARATOR . 'inc' . DIRECTORY_SEPARATOR . 'php-jwt'
-                . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
+            $jwtAutoload = __DIR__
+                . DIRECTORY_SEPARATOR . 'inc'
+                . DIRECTORY_SEPARATOR . 'extension'
+                . DIRECTORY_SEPARATOR . 'php-jwt'
+                . DIRECTORY_SEPARATOR . 'vendor'
+                . DIRECTORY_SEPARATOR . 'autoload.php';
             if (is_file($jwtAutoload)) {
                 require_once $jwtAutoload;
             }

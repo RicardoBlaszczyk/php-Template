@@ -18,6 +18,93 @@ class config
     protected $UPDATEVON;
     protected $GELOESCHT;
 
+    public $arr_cards = array(
+        'Setup'        => array(
+            array(
+                'title'       => 'Basis-Konfiguration',
+                'description' => 'Grundlegende Einstellungen 360DashBoard Interface',
+                'modal'       => 'config_interface_setup',
+                'ident'       => 'interfaceSetup',
+            ),
+            array(
+                'title'       => 'Interfacespezifische Einstellungen',
+                'description' => 'Spezifische Einstellungen für das Interface Genesys4Aktendeckel',
+                'modal'       => 'config_detail_setup',
+                'ident'       => 'detailSetup',
+            ),
+            array(
+                'title'       => 'Lokale Dateiablage',
+                'description' => 'Bearbeiten der Konfiguration lokaler Dateiablage',
+                'modal'       => 'config_file_paths',
+                'ident'       => 'localPathSetup',
+            ),
+        ),
+        'Benutzer'     => array(
+            array(
+                'title'       => 'Interface Administrator',
+                'description' => 'Bearbeiten der Administratorinformationen',
+                'modal'       => 'config_interface_admin',
+                'ident'       => 'interfaceAdmin',
+            ),
+            array(
+                'title'       => 'Interface Benutzer',
+                'description' => 'Übersicht der Interface Benutzer',
+                'modal'       => 'config_user_list',
+                'ident'       => 'interfaceUser',
+            ),
+            array(
+                'title'       => 'Interface Benutzer hinzufügen',
+                'description' => 'Hinzufügen eines Interface Benutzers',
+                'modal'       => 'interfaceAddUser',
+                'ident'       => 'interfaceUser',
+            ),
+            array(
+                'title'       => 'IP-Räume für Benutzer',
+                'description' => 'Hinzufügen von IP Räumen zur passwortfreien Nutzung',
+                'modal'       => 'config_user_ips',
+                'ident'       => 'interfaceUserIPs',
+            ),
+            array(
+                'title'       => 'Token-Verwaltung für Benutzeranmeldung',
+                'description' => 'Für Zugänge aus Drittanwendungen',
+                'modal'       => 'config_user_token',
+                'ident'       => 'tokenUser',
+            ),
+        ),
+        'Datenbank'    => array(
+            array(
+                'title'       => 'SQL-Serveranbindung',
+                'description' => 'Bearbeiten Verbindung zu Interfacedatenbank',
+                'modal'       => 'config_sql_connection',
+                'ident'       => 'interfaceDB',
+            ),
+        ),
+        'Rest APIs'    => array(
+            array(
+                'title'       => 'Interface Rest-APIs',
+                'description' => 'Bearbeiten der internen REST-Anbindung zu diesem Interface',
+                'modal'       => 'config_rest_connection',
+                'ident'       => 'interfaceRest',
+            ),
+        ),
+        'Verbindungen' => array(
+            array(
+                'title'       => 'Interface Verbindungen',
+                'description' => 'Bearbeiten der eigenen Verbindungen zu diesem Interface',
+                'modal'       => 'config_interface_connection',
+                'ident'       => 'interfaceConnection',
+            ),
+        ),
+        'Sonstiges'    => array(
+            array(
+                'title'       => 'Interface Sonstiges',
+                'description' => 'Bearbeiten der sonstigen Einstellungen zu diesem Interface',
+                'modal'       => 'config_interface_other',
+                'ident'       => 'interfaceOther',
+            )
+        ),
+    );
+
     /**
      * User constructor.
      *
@@ -97,7 +184,7 @@ class config
     protected static function createDatabaseTable()
     {
         $fields = [
-            'ID'          => self::$dbConnection->primaryKey(),
+            'ident'       => self::$dbConnection->primaryKey(),
             'key'         => self::$dbConnection->string(100) . ' NOT NULL',
             'value'       => self::$dbConnection->string(4000),
             'ERSTELLTAM'  => self::$dbConnection->dateTime(),
@@ -138,12 +225,12 @@ class config
         $this->UPDATEAM  = date('Y-m-d H:i:s');
         $this->UPDATEVON = $currentConfig;
         $data            = get_object_vars($this);
-        unset($data['ID']);
+        unset($data['ident']);
         if ($this->ID === null) {
             $result   = self::$dbConnection->insertRow(self::TABLE_NAME, $data);
             $this->ID = $result;
         } else {
-            self::$dbConnection->update(self::TABLE_NAME, $data, ['ID' => $this->ID]);
+            self::$dbConnection->update(self::TABLE_NAME, $data, ['ident' => $this->ID]);
         }
     }
 
@@ -156,7 +243,7 @@ class config
     public static function getConfig($ID)
     {
         self::checkDatabaseTable();
-        $dbResult = self::$dbConnection->getOne(self::TABLE_NAME, ['ID' => $ID]);
+        $dbResult = self::$dbConnection->getOne(self::TABLE_NAME, ['ident' => $ID]);
         if (!empty($dbResult)) {
             return self::dbVarsToConfig($dbResult);
         }
@@ -184,7 +271,7 @@ class config
         return new self(
             $dbResult['key'],
             $dbResult['value'],
-            $dbResult['ID'],
+            $dbResult['ident'],
             $dbResult['ERSTELLTAM'],
             $dbResult['ERSTELLTVON'],
             $dbResult['UPDATEAM'],
