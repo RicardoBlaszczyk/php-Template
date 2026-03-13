@@ -158,16 +158,6 @@ function safefilerewrite($fileName, $dataToSave)
     }
 }
 
-/**
- * @param $databaseInfo
- *
- * @return array|false|DbConnector
- */
-/**
- * @param $databaseInfo
- *
- * @return array|false|DbConnector
- */
 function checkDb($databaseInfo)
 {
     $errors = [];
@@ -238,6 +228,188 @@ function checkDb($databaseInfo)
     }
 
     return $errors;
+}
+function checkDbServerConnection(array $databaseInfo)
+{
+    $type = strtoupper((string)($databaseInfo['typ'] ?? 'MSSQL'));
+
+    switch ($type) {
+        case 'MSSQL':
+            $server   = trim((string)($databaseInfo['server'] ?? ''));
+            $port     = trim((string)($databaseInfo['port'] ?? ''));
+            $user     = (string)($databaseInfo['user'] ?? '');
+            $password = (string)($databaseInfo['pass'] ?? '');
+
+            $serverName = $server;
+            if ($port !== '') {
+                $serverName .= ',' . $port;
+            }
+
+            $connectionOptions = [
+                'Database' => 'master',
+                'UID' => $user,
+                'PWD' => $password,
+                'CharacterSet' => 'utf-8',
+                'ReturnDatesAsStrings' => true,
+            ];
+
+            $connection = sqlsrv_connect($serverName, $connectionOptions);
+            if ($connection === false) {
+                return sqlsrv_errors();
+            }
+
+            sqlsrv_close($connection);
+            return true;
+
+        case 'MYSQL':
+            $server   = trim((string)($databaseInfo['server'] ?? ''));
+            $port     = trim((string)($databaseInfo['port'] ?? ''));
+            $user     = (string)($databaseInfo['user'] ?? '');
+            $password = (string)($databaseInfo['pass'] ?? '');
+
+            $port = $port !== '' ? (int)$port : 3306;
+
+            $connection = mysqli_init();
+            if ($connection === false) {
+                return ['MySQL-Verbindung konnte nicht initialisiert werden.'];
+            }
+
+            $connected = mysqli_real_connect($connection, $server, $user, $password, null, $port);
+            if ($connected === false) {
+                return [mysqli_connect_error()];
+            }
+
+            mysqli_close($connection);
+            return true;
+
+        case 'ODBC':
+            return ['Server-Prüfung für ODBC wird aktuell nicht unterstützt.'];
+
+        default:
+            return ['Unbekannter Datenbanktyp.'];
+    }
+}
+
+function hasDatabaseName(array $databaseInfo): bool
+{
+    return trim((string)($databaseInfo['db'] ?? '')) !== '';
+}
+
+function validateDatabaseName(string $databaseName): void
+{
+    if (!preg_match('/^[A-Za-z0-9_\-]+$/', $databaseName)) {
+        throw new RuntimeException('Der Datenbankname enthält ungültige Zeichen.');
+    }
+}
+
+function createMssqlDatabaseIfNotExists(array $databaseInfo): void
+{
+    $server   = trim((string)($databaseInfo['server'] ?? ''));
+    $port     = trim((string)($databaseInfo['port'] ?? ''));
+    $user     = (string)($databaseInfo['user'] ?? '');
+    $password = (string)($databaseInfo['pass'] ?? '');
+    $database = trim((string)($databaseInfo['db'] ?? ''));
+
+    if ($database === '') {
+        return;
+    }
+
+    validateDatabaseName($database);
+
+    $serverName = $server;
+    if ($port !== '') {
+        $serverName .= ',' . $port;
+    }
+
+    $connectionOptions = [
+        'Database' => 'master',
+        'UID' => $user,
+        'PWD' => $password,
+        'CharacterSet' => 'utf-8',
+        'ReturnDatesAsStrings' => true,
+    ];
+
+    $connection = sqlsrv_connect($serverName, $connectionOptions);
+    if ($connection === false) {
+        throw new RuntimeException('Verbindung zum MSSQL-Server fehlgeschlagen.');
+    }
+
+    $sql = "
+        IF DB_ID(N'{$database}') IS NULL
+        BEGIN
+            EXEC('CREATE DATABASE [{$database}]')
+        END
+    ";
+
+    $stmt = sqlsrv_query($connection, $sql);
+    if ($stmt === false) {
+        $errors = sqlsrv_errors();
+        sqlsrv_close($connection);
+        throw new RuntimeException('MSSQL-Datenbank konnte nicht erstellt werden: ' . print_r($errors, true));
+    }
+
+    sqlsrv_close($connection);
+}
+
+function createMysqlDatabaseIfNotExists(array $databaseInfo): void
+{
+    $server   = trim((string)($databaseInfo['server'] ?? ''));
+    $port     = trim((string)($databaseInfo['port'] ?? ''));
+    $user     = (string)($databaseInfo['user'] ?? '');
+    $password = (string)($databaseInfo['pass'] ?? '');
+    $database = trim((string)($databaseInfo['db'] ?? ''));
+
+    if ($database === '') {
+        return;
+    }
+
+    validateDatabaseName($database);
+
+    $port = $port !== '' ? (int)$port : 3306;
+
+    $connection = mysqli_init();
+    if ($connection === false) {
+        throw new RuntimeException('MySQL-Verbindung konnte nicht initialisiert werden.');
+    }
+
+    $connected = mysqli_real_connect($connection, $server, $user, $password, null, $port);
+    if ($connected === false) {
+        throw new RuntimeException('Verbindung zum MySQL-Server fehlgeschlagen: ' . mysqli_connect_error());
+    }
+
+    $sql = "CREATE DATABASE IF NOT EXISTS `{$database}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+    if (!mysqli_query($connection, $sql)) {
+        $error = mysqli_error($connection);
+        mysqli_close($connection);
+        throw new RuntimeException('MySQL-Datenbank konnte nicht erstellt werden: ' . $error);
+    }
+
+    mysqli_close($connection);
+}
+
+function createDatabaseIfNotExists(array $databaseInfo): void
+{
+    if (!hasDatabaseName($databaseInfo)) {
+        return;
+    }
+
+    $type = strtoupper((string)($databaseInfo['typ'] ?? 'MSSQL'));
+
+    switch ($type) {
+        case 'MSSQL':
+            createMssqlDatabaseIfNotExists($databaseInfo);
+            break;
+
+        case 'MYSQL':
+            createMysqlDatabaseIfNotExists($databaseInfo);
+            break;
+
+        case 'ODBC':
+            throw new RuntimeException('Automatisches Anlegen einer Datenbank wird für ODBC aktuell nicht unterstützt.');
+
+        default:
+            throw new RuntimeException('Unbekannter Datenbanktyp: ' . $type);
+    }
 }
 
 /**

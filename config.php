@@ -15,8 +15,6 @@ $breadcrumbs = [
 
 $arr_benutzer        = User::getUsers();
 $arr_benutzergruppen = [];
-$obj_documents       = new documents();
-$arr_docTypeNames    = $obj_documents->getDocTypesNames();
 
 foreach ($arr_benutzer as $key => $user) {
     $arr_temp = explode(';', $user['userGroups']);
@@ -45,7 +43,6 @@ try {
 /**
  * TASK-Status
  */
-
 $tasks = file_exists(TASK_STATUS_FILE)
         ? json_decode(file_get_contents(TASK_STATUS_FILE), true)
         : [];

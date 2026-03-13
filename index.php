@@ -33,9 +33,8 @@ $jwt        = '';
 if (is_string($authHeader) && preg_match('/^\s*Bearer\s+(.+)\s*$/i', $authHeader, $m)) {
     $jwt = $m[1];
 }
-
-$loggedIn    = user::getLoggedInUser();
-$obj_batches = new batches();
+// user logged in?
+$loggedIn = user::getLoggedInUser();
 
 if (!$loggedIn && !empty($jwt) && empty($noJwtRedirect)) {
     $arr_query = array(
@@ -64,47 +63,11 @@ if (!$loggedIn) {
             ['title' => 'Startseite', 'url' => 'index.php']
     ];
 } else {
-    // wenn Stapel-Id mit im Aufruf enthalten ist, dann zu diesem Stapel
-    if (!empty($_REQUEST['batch_id'])) {
-        header('Location: documents.php?batch_id=' . $_REQUEST['batch_id']);
-        exit;
-    }
-    // wenn angemeldet dann zu den Stapeln
-    header('Location: batches.php');
-    exit;
+    // ggf. Redirect auf Dashboard
+    $breadcrumbs = [
+            ['title' => 'Startseite', 'url' => 'index.php']
+    ];
 }
-
-$perpage = 20;
-$offset  = !is_numeric($offset) ? 0 : $offset;
-$limit   = !is_numeric($limit) ? $perpage : $limit;
-
-if ($order_col != '' && $order != '') {
-    $sql_order = ' ' . $order_col . ' ' . $order;
-} else {
-    $sql_order = ' ID desc ';
-}
-
-if ($search_col != '' && $search != '') {
-
-    $search_type = $obj_batches::$tableColumnTypes[$obj_batches->table][$search_col];
-
-    switch ($search_type) {
-        case 'int':
-        case 'bigint':
-            $sql_search = [$search_col => $search];
-            break;
-        default:
-            $sql_search = ["LIKE" => [$search_col => "%" . $search . "%"]];
-            break;
-    }
-
-
-} else {
-    $sql_search = [];
-}
-
-$arr_viewresult = $obj_batches->get_datensatz($sql_search, $sql_order, $limit, $offset);
-$int_count      = $obj_batches->get_datensatz_count($sql_search, '*');
 
 ?>
 <!doctype html>
@@ -152,9 +115,9 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
 
                 $arr_configs = config::getConfigs();
 
-                foreach($arr_configs as $key => $val){
-                    $new_key = first_part_before_underscore_lower($val['key']);
-                    $arr_data[$new_key][str_replace($new_key.'_', '', strtolower($val['key'] ))] = $val['value'];
+                foreach ($arr_configs as $key => $val) {
+                    $new_key                                                                      = first_part_before_underscore_lower($val['key']);
+                    $arr_data[$new_key][str_replace($new_key . '_', '', strtolower($val['key']))] = $val['value'];
                 }
 
 

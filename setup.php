@@ -19,6 +19,7 @@ define('ROOT', __DIR__ . DIRECTORY_SEPARATOR);
 define('PROJECT_PATH', basename(__DIR__));
 define('PROJECT_NAME', basename(__DIR__));
 define('VERSION_NR', 'Setup');
+
 session_name("INSTALLSETUP");
 session_start();
 
@@ -57,17 +58,44 @@ if (($_GET['action'] ?? '') === 'check_db') {
     header('Content-Type: application/json; charset=utf-8');
 
     $databaseInfo = $_POST['mssql'] ?? [];
-    $checkDb      = checkDb($databaseInfo);
+    $databaseName = trim((string)($databaseInfo['db'] ?? ''));
 
-    if ($checkDb !== false && !is_array($checkDb)) {
-        echo json_encode([
-                                 'success' => true,
-                                 'message' => 'Datenbankverbindung erfolgreich hergestellt.'
-                         ], JSON_UNESCAPED_UNICODE);
-    } else {
+    if ($databaseName === '') {
+        $serverCheck = checkDbServerConnection($databaseInfo);
+
+        if ($serverCheck === true) {
+            echo json_encode([
+                                     'success' => true,
+                                     'message' => 'Serververbindung erfolgreich hergestellt. Es wurde kein Datenbankname angegeben.'
+                             ], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode([
+                                     'success' => false,
+                                     'message' => is_array($serverCheck) ? implode('<br>', array_map('strval', $serverCheck)) : 'Serververbindung fehlgeschlagen.'
+                             ], JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+    }
+
+    try {
+        createDatabaseIfNotExists($databaseInfo);
+        $checkDb = checkDb($databaseInfo);
+
+        if ($checkDb !== false && !is_array($checkDb)) {
+            echo json_encode([
+                                     'success' => true,
+                                     'message' => 'Datenbankverbindung erfolgreich hergestellt.'
+                             ], JSON_UNESCAPED_UNICODE);
+        } else {
+            echo json_encode([
+                                     'success' => false,
+                                     'message' => is_array($checkDb) ? implode('<br>', $checkDb) : 'Verbindung fehlgeschlagen.'
+                             ], JSON_UNESCAPED_UNICODE);
+        }
+    } catch (Throwable $e) {
         echo json_encode([
                                  'success' => false,
-                                 'message' => is_array($checkDb) ? implode('<br>', $checkDb) : 'Verbindung fehlgeschlagen.'
+                                 'message' => $e->getMessage()
                          ], JSON_UNESCAPED_UNICODE);
     }
     exit;
@@ -137,94 +165,113 @@ $breadcrumbs = [
 
 switch ($action) {
     case 'update':
-        if (!empty($_POST)) {
-            foreach ($mandatory as $fieldGroup => $fields) {
-                foreach ($fields as $field => $fieldName) {
-                    if (empty($_POST[$fieldGroup][$field])) {
-                        $errors[] = $fieldName . " ist ein Pflichtfeld";
-                    }
-                }
+        if (empty($_POST)) {
+            break;
+        }
+
+        $useMssql = isset($_POST['mssql']['use']) && (string)$_POST['mssql']['use'] === '1';
+
+        foreach ($mandatory as $fieldGroup => $fields) {
+            if ($fieldGroup === 'mssql' && !$useMssql) {
+                continue;
             }
-            if (empty($errors)) {
-                //Die Validierung der Pflichtfelder war erfolgreich
-                $checkDb = checkDb($_POST['mssql']);
-                if ($checkDb !== false && !is_array($checkDb)) {
-                    $connection = $checkDb;
-                    if (empty($errors)) {
-                        unset($_POST['action']);
-                        write_php_ini($_POST, ROOT . 'sicher' . DIRECTORY_SEPARATOR . 'ini' . DIRECTORY_SEPARATOR . 'config.ini');
 
-                        foreach ($_POST as $key => $val) {
-                            if (is_array($val)) {
-                                foreach ($val as $skey => $sval) {
-                                    // nur Datenbank
-                                    if (strtoupper($key == 'MSSQL')) {
-                                        unset($_POST[$key][$skey]);
-                                    } else {
-                                        $res[] = $key . " = " . (is_numeric($sval) ? $sval : "'" . $sval . "'");
-                                    }
-                                }
-                            } else {
-                                $res[] = $key . " = " . (is_numeric($val) ? $val : "'" . $val . "'");
-                            }
-                        }
-                        // zusammenfassen
-                        $res = implode("\r\n", $res);
-                        /**
-                         * Firma erstellen
-                         */
-                        $obj_firma = new firma();
-                        $arr_post  = array(
-                                'name'    => $_POST['company']['name'],
-                                'account' => $_POST['company']['account'],
-                                'number'  => $_POST['company']['number'],
-                        );
-                        $obj_firma->set_vars($arr_post);
-                        $error = $obj_firma->check_data();
-                        if (empty($error)) {
-                            $obj_firma->insert();
-                        }
-                        /**
-                         * Filiale erstellen
-                         */
-                        $obj_filiale = new filiale();
-                        $arr_post    = array(
-                                'name'     => $_POST['branch']['name'],
-                                'number'   => $_POST['branch']['number'],
-                                'firma_id' => $obj_firma->ID,
-                        );
-                        $obj_filiale->set_vars($arr_post);
-                        $error = $obj_filiale->check_data();
-                        if (empty($error)) {
-                            $obj_filiale->insert();
-                        }
-                        /**
-                         * Benutzer erstellen
-                         */
-                        include "sicher/data.php";
-                        $user = user::createUser($_POST['login']['user'], $_POST['login']['pass'], '01', '01');
-                        if ($user !== false) {
-                            $groups = array('admin');
-                            $user->setVars(['userGroups' => json_encode(array_values($groups), JSON_UNESCAPED_UNICODE)]);
-                            $user->saveToDb();
-                            Notification::info('Benutzer erfolgreich erstellt');
-                        } else {
-                            Notification::error('Fehler beim Erstellen des Administrators');
-                        }
-
-                        header('Location: index.php');
-                        die;
-                    }
+            foreach ($fields as $field => $fieldName) {
+                if ($fieldGroup === 'mssql' && $field === 'db' && !hasDatabaseName($_POST['mssql'] ?? [])) {
+                    continue;
                 }
-                if (is_array($checkDb)) {
-                    $errors = array_merge($errors, $checkDb);
+
+                if (empty($_POST[$fieldGroup][$field])) {
+                    $errors[] = $fieldName . " ist ein Pflichtfeld";
                 }
             }
         }
-        break;
+
+        $connection = false;
+
+        if (empty($errors) && $useMssql) {
+            try {
+                if (hasDatabaseName($_POST['mssql'])) {
+                    createDatabaseIfNotExists($_POST['mssql']);
+                    $checkDb = checkDb($_POST['mssql']);
+
+                    if (is_array($checkDb)) {
+                        $errors = array_merge($errors, $checkDb);
+                    } elseif ($checkDb !== false) {
+                        $connection = $checkDb;
+                    } else {
+                        $errors[] = 'Verbindung zur Datenbank fehlgeschlagen.';
+                    }
+                } else {
+                    $serverCheck = checkDbServerConnection($_POST['mssql']);
+
+                    if ($serverCheck !== true) {
+                        $errors[] = is_array($serverCheck)
+                                ? implode(', ', array_map('strval', $serverCheck))
+                                : 'Verbindung zum Datenbankserver fehlgeschlagen.';
+                    }
+                }
+            } catch (Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
+        } else {
+            break;
+        }
+
+        if (!empty($errors)) {
+            break;
+        }
+
+        unset($_POST['action']);
+        write_php_ini($_POST, ROOT . 'sicher' . DIRECTORY_SEPARATOR . 'ini' . DIRECTORY_SEPARATOR . 'config.ini');
+
+        /**
+         * Firma erstellen
+         */
+        $obj_firma = new firma();
+        $arr_post  = array(
+                'name'    => $_POST['company']['name'],
+                'account' => $_POST['company']['account'],
+                'number'  => $_POST['company']['number'],
+        );
+        $obj_firma->set_vars($arr_post);
+        $error = $obj_firma->check_data();
+        if (empty($error)) {
+            $obj_firma->insert();
+        }
+
+        /**
+         * Filiale erstellen
+         */
+        $obj_filiale = new filiale();
+        $arr_post    = array(
+                'name'     => $_POST['branch']['name'],
+                'number'   => $_POST['branch']['number'],
+                'firma_id' => $obj_firma->ID,
+        );
+        $obj_filiale->set_vars($arr_post);
+        $error = $obj_filiale->check_data();
+        if (empty($error)) {
+            $obj_filiale->insert();
+        }
+
+        /**
+         * Benutzer erstellen
+         */
+        include "sicher/data.php";
+        $user = user::createUser($_POST['login']['user'], $_POST['login']['pass'], '01', '01');
+        if ($user !== false) {
+            $groups = array('admin');
+            $user->setVars(['userGroups' => json_encode(array_values($groups), JSON_UNESCAPED_UNICODE)]);
+            $user->saveToDb();
+            Notification::info('Benutzer erfolgreich erstellt');
+        } else {
+            Notification::error('Fehler beim Erstellen des Administrators');
+        }
+
+        header('Location: index.php');
+        die;
 }
-
-
 ?>
 <!doctype html>
 <html lang="en">
@@ -300,7 +347,7 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
                                     vorhanden ist.</p>
                                 <div class="mb-3">
                                     <a href="#"
-                                       class="btn btn-outline-secondary btn-sm mb-3" data-bs-toggle="modal"
+                                       class="btn btn-outline-secondary mb-3" data-bs-toggle="modal"
                                        data-bs-target="#defaultIniModal">
                                         Default-Konfiguration anzeigen
                                     </a>
@@ -339,8 +386,7 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
                                        for="mssql_use">Datenbankverbindung nutzen</label>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label" for="mssql_typ">Verbindung zu Datenbanktyp<span
-                                            class="text-danger">*</span></label><br/>
+                                <label class="form-label" for="mssql_typ">Verbindung zu Datenbanktyp</label><br/>
 
                                 <?php $selectedType = $_POST['mssql']['typ'] ?? 'MSSQL'; ?>
 
@@ -373,20 +419,21 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
                             </div>
                             <div class="row mb-3">
                                 <div class="col-9">
-                                    <label class="form-label" for="mssql_server">Server<span
-                                                class="text-danger">*</span></label>
+                                    <label class="form-label" for="mssql_server">Server</label>
                                     <div class="input-group">
                                     <span class="input-group-text input-group-text-fixed">
                                         <i class="fa fa-server"></i></span>
                                         <input type="text" class="form-control" id="mssql_server" name="mssql[server]"
-                                               required
                                                placeholder="SERVER/INSTANZ"
                                                value="<?php echo $_POST['mssql']['server'] ?? '' ?>">
                                     </div>
                                 </div>
                                 <div class="col-3">
                                     <label class="form-label" for="mssql_port">Port<br></label>
-                                    <input type="text" class="form-control" id="mssql_port" name="mssql[port]"
+                                    <input type="text"
+                                           class="form-control"
+                                           id="mssql_port"
+                                           name="mssql[port]"
                                            placeholder="1433" value="<?php echo $_POST['mssql']['port'] ?? '' ?>">
                                 </div>
                                 <div class="form-text">Standardwerte Post: 1433 (MSSQL) /
@@ -396,39 +443,44 @@ if (!defined('VERSION_TYP') || empty(VERSION_TYP)) {
                             </div>
                             <div class="row mb-3">
                                 <div class="col-6">
-                                    <label class="form-label" for="mssql_user">Datenbank-Benutzer<span
-                                                class="text-danger">*</span></label>
+                                    <label class="form-label" for="mssql_user">Datenbank-Benutzer</label>
                                     <div class="input-group">
                                     <span class="input-group-text input-group-text-fixed">
                                         <i class="fa fa-user"></i></span>
-                                        <input type="text" class="form-control" id="mssql_user" name="mssql[user]"
-                                               required
-                                               placeholder="sa" value="<?php echo $_POST['mssql']['user'] ?? '' ?>">
+                                        <input type="text"
+                                               class="form-control"
+                                               id="mssql_user"
+                                               name="mssql[user]"
+                                               value="<?php echo $_POST['mssql']['user'] ?? '' ?>">
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <label class="form-label" for="mssql_pass">Datenbank-Passwort<span
-                                                class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="mssql_pass" name="mssql[pass]"
-                                           required
+                                    <label class="form-label" for="mssql_pass">Datenbank-Passwort</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           id="mssql_pass"
+                                           name="mssql[pass]"
                                            value="<?php echo $_POST['mssql']['pass'] ?? '' ?>">
                                 </div>
                             </div>
                             <div class="row mb-3">
                                 <div class="col-8">
-                                    <label class="form-label" for="mssql_db">Datenbank<span
-                                                class="text-danger">*</span></label>
+                                    <label class="form-label" for="mssql_db">Datenbank</label>
                                     <div class="input-group">
                                     <span class="input-group-text input-group-text-fixed">
                                         <i class="fa fa-database"></i></span>
-                                        <input type="text" class="form-control" id="mssql_db" name="mssql[db]" required
-                                               placeholder="DATENBANK"
+                                        <input type="text"
+                                               class="form-control"
+                                               id="mssql_db"
+                                               name="mssql[db]"
                                                value="<?php echo $_POST['mssql']['db'] ?? '' ?>">
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <label class="form-label">&nbsp;
-                                        <input type="hidden" id="mssql_check" name="mssql[check]" required
+                                        <input type="hidden"
+                                               id="mssql_check"
+                                               name="mssql[check]"
                                                value="<?php echo $_POST['mssql']['check'] ?? 'error' ?>">
                                     </label><br/>
                                     <button type="button" id="mssql_check_btn" class="btn btn-outline-secondary w-100">
