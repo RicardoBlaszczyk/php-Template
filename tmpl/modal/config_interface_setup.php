@@ -96,11 +96,10 @@ $modal_ident = 'interfaceSetup';
                             <select class="form-select"
                                     id="project_company"
                                     name="project[company]">
-                                <option value="">Auswahl...</option>
                                 <?php
                                 if (!empty($arr_firmen) && !isset($arr_firmen['error'])) {
                                     foreach ($arr_firmen as $key => $val) {
-                                        $sel = defined('PROJECT_COMPANY') && $val['number'] == PROJECT_COMPANY ? 'selected="selected' : '';
+                                        $sel = defined('PROJECT_COMPANY') && $val['number'] == PROJECT_COMPANY ? 'selected="selected"' : '';
                                         ?>
                                         <option value="<?php echo $val['number'] ?>" <?php echo $sel ?>><?php echo $val['name'] ?></option>
                                     <?php }
@@ -114,11 +113,10 @@ $modal_ident = 'interfaceSetup';
                             <select class="form-select"
                                     id="project_branch"
                                     name="project[branch]">
-                                <option value="">Auswahl...</option>
                                 <?php
                                 if (!empty($arr_filialen) && !isset($arr_filialen['error'])) {
                                     foreach ($arr_filialen as $key => $val) {
-                                        $sel = defined('PROJECT_BRANCH') && $val['number'] == PROJECT_BRANCH ? 'selected="selected' : '';
+                                        $sel = defined('PROJECT_BRANCH') && $val['number'] == PROJECT_BRANCH ? 'selected="selected"' : '';
                                         ?>
                                         <option value="<?php echo $val['number'] ?>" <?php echo $sel ?>><?php echo $val['name'] ?></option>
                                     <?php }

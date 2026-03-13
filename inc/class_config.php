@@ -184,7 +184,7 @@ class config
     protected static function createDatabaseTable()
     {
         $fields = [
-            'ident'       => self::$dbConnection->primaryKey(),
+            'ID'       => self::$dbConnection->primaryKey(),
             'key'         => self::$dbConnection->string(100) . ' NOT NULL',
             'value'       => self::$dbConnection->string(4000),
             'ERSTELLTAM'  => self::$dbConnection->dateTime(),
@@ -225,12 +225,13 @@ class config
         $this->UPDATEAM  = date('Y-m-d H:i:s');
         $this->UPDATEVON = $currentConfig;
         $data            = get_object_vars($this);
-        unset($data['ident']);
+        unset($data['ID']);
+        unset($data['arr_cards']);
         if ($this->ID === null) {
             $result   = self::$dbConnection->insertRow(self::TABLE_NAME, $data);
             $this->ID = $result;
         } else {
-            self::$dbConnection->update(self::TABLE_NAME, $data, ['ident' => $this->ID]);
+            self::$dbConnection->update(self::TABLE_NAME, $data, ['ID' => $this->ID]);
         }
     }
 
@@ -271,7 +272,7 @@ class config
         return new self(
             $dbResult['key'],
             $dbResult['value'],
-            $dbResult['ident'],
+            $dbResult['ID'],
             $dbResult['ERSTELLTAM'],
             $dbResult['ERSTELLTVON'],
             $dbResult['UPDATEAM'],

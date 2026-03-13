@@ -80,8 +80,8 @@ switch ($action) {
 
         unset($_POST['action']);
         // neuer benutzer
-        $arr_newUser = $_POST['newUser'];
-        unset($_POST['newUser']);
+        $arr_newUser = !empty($_POST['newUser']) ? $_POST['newUser'] : null;
+
         // ini schreiben und speichern
         write_php_ini($_POST, ROOT . 'sicher' . DIRECTORY_SEPARATOR . 'ini' . DIRECTORY_SEPARATOR . 'config.ini');
 
@@ -89,7 +89,7 @@ switch ($action) {
          * Benutzer wird erstellt, falls nicht bereits vorhanden.
          * Achtung: Session wird geschlossen, wenn der Benutzer erstellt wird.
          */
-        if (user::getUserbyName($_POST['api']['user']) === false) {
+        if (!empty($_POST['api']['user']) && user::getUserbyName($_POST['api']['user']) === false) {
             $adminUser = user::createUser($_POST['api']['user'], $_POST['api']['pass'], '01', '01');
             $groups    = array('admin');
             $adminUser->setVars(['userGroups' => json_encode(array_values($groups), JSON_UNESCAPED_UNICODE)]);
@@ -102,9 +102,11 @@ switch ($action) {
             $adminUser->saveToDb();
         }
 
-        if (user::getUserbyName($arr_newUser['user']) === false) {
+        if (!empty($arr_newUser['user']) && user::getUserbyName($arr_newUser['user']) === false) {
             $user = user::createUser($arr_newUser['user'], $arr_newUser['pass'], (!empty($arr_newUser['firma']) ? $arr_newUser['firma'] : '01'), (!empty($arr_newUser['filiale']) ? $arr_newUser['filiale'] : '01'));
         }
+
+        Notification::info('Konfiguration erfolgreich gespeichert');
 
         header('Location: config.php');
         break;
@@ -183,8 +185,9 @@ if (defined('VERSION_TYP') && !empty(VERSION_TYP)) {
 <section class="content-footer"></section>
 <?php include 'tmpl/foot.php' ?>
 <script src="js/checkLink.js"></script>
+<!--
 <script src="js/config.js?t=<?php time() ?>"></script>
-
+-->
 <script>
     // ... existing code ...
 
