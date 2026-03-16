@@ -36,7 +36,7 @@ $modal_ident = 'interfaceSetup';
                             <input type="hidden"
                                    class="form-control"
                                    id="url-project_path"
-                                   value="<?php echo getServerBaseUrl() . '/' . (defined('PROJECT_PATH') ? PROJECT_PATH : ''); ?>"/>
+                                   value="<?php echo getServerBaseUrl() . '/' . (defined('PROJECT_PATH') ? PROJECT_PATH : ''); ?>/index.php"/>
 
                             <label class="col-form-label"
                                    for="project_path">Base URL <code>PROJECT_PATH</code></label>

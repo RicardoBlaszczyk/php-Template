@@ -90,7 +90,7 @@ $(function () {
                 toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
             },
             error: function () {
-                alert('Fehler bei der Verbindung zum Server.');
+                alert('Fehler bei der Verbindung zum Server. ' + url);
             },
             complete: function () {
                 // $btn.prop('disabled', false).text('Prüfen #' + id);
