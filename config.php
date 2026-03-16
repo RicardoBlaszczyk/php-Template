@@ -185,9 +185,8 @@ if (defined('VERSION_TYP') && !empty(VERSION_TYP)) {
 <section class="content-footer"></section>
 <?php include 'tmpl/foot.php' ?>
 <script src="js/checkLink.js"></script>
-<!--
+
 <script src="js/config.js?t=<?php time() ?>"></script>
--->
 <script>
     // ... existing code ...
 
