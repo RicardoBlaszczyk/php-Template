@@ -16,7 +16,20 @@ $modal_ident = 'interfaceAdmin';
             <div class="modal-body">
                 <div class="row">
                     <div class="col-sm-12">
-
+                        <div class="form-group">
+                            <label class="col-form-label" for="login_user">Benutzername</label>
+                            <input type="text" class="form-control" id="login_user"
+                                   name="login[user]"
+                                   value="<?php echo defined('LOGIN_USER') ? LOGIN_USER : '' ?>">
+                        </div>
+                        <div class="form-group">
+                            <label class="col-form-label"
+                                   for="login_pass">Passwort</label>
+                            <input type="text" class="form-control" id="login_pass"
+                                   name="login[pass]"
+                                   placeholder="<?php echo defined('LOGIN_PASS') && !empty(LOGIN_PASS) ? '********' : ''; ?>"
+                                   value="<?php //echo LOGIN_PASS       ?>">
+                        </div>
                     </div>
                 </div>
             </div>
