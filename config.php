@@ -15,15 +15,38 @@ $breadcrumbs = [
 
 $arr_benutzer        = User::getUsers();
 $arr_benutzergruppen = [];
+$arr_positionen      = [];
 
 foreach ($arr_benutzer as $key => $user) {
-    $arr_temp = explode(';', $user['userGroups']);
-    foreach ($arr_temp as $value) {
-        if (!empty($value)) {
-            $arr_benutzergruppen[$value]['name'] = $value;
+    if (!empty($user['userPosition'])) {
+        $position = trim($user['userPosition']);
+        if ($position !== '') {
+            $arr_positionen[$position] = [
+                    'name' => $position
+            ];
+        }
+    }
+
+    if (!empty($user['userGroups'])) {
+        $decodedGroups = @json_decode($user['userGroups'], true);
+
+        if (is_array($decodedGroups)) {
+            $arr_temp = $decodedGroups;
+        } else {
+            $arr_temp = explode(';', $user['userGroups']);
+        }
+
+        foreach ($arr_temp as $value) {
+            $value = trim($value);
+            if (!empty($value)) {
+                $arr_benutzergruppen[$value]['name'] = $value;
+            }
         }
     }
 }
+
+ksort($arr_positionen, SORT_NATURAL | SORT_FLAG_CASE);
+ksort($arr_benutzergruppen, SORT_NATURAL | SORT_FLAG_CASE);
 
 $obj_config   = new config(null);
 $obj_firma    = new firma();
@@ -103,7 +126,22 @@ switch ($action) {
         }
 
         if (!empty($arr_newUser['user']) && user::getUserbyName($arr_newUser['user']) === false) {
-            $user = user::createUser($arr_newUser['user'], $arr_newUser['pass'], (!empty($arr_newUser['firma']) ? $arr_newUser['firma'] : '01'), (!empty($arr_newUser['filiale']) ? $arr_newUser['filiale'] : '01'));
+
+            $resolvedFirma   = $obj_firma->resolveFirmaNumber($arr_newUser['firma'] ?? '', $arr_firmen) ?? '01';
+            $resolvedFiliale = $obj_filiale->resolveFilialeNumber($arr_newUser['filiale'] ?? '', $resolvedFirma, $arr_firmen, $arr_filialen) ?? '01';
+
+            $newUserGroups = [];
+            if (!empty($arr_newUser['group']) && is_array($arr_newUser['group'])) {
+                $newUserGroups = array_values(array_filter(array_map('trim', $arr_newUser['group'])));
+            }
+
+            $user = user::createUser(
+                    $arr_newUser['user'],
+                    $arr_newUser['pass'],
+                    $resolvedFirma,
+                    $resolvedFiliale,
+                    (!empty($arr_newUser['position']) ? $arr_newUser['position'] : null),
+                    (!empty($newUserGroups) ? json_encode($newUserGroups, JSON_UNESCAPED_UNICODE) : null));
         }
 
         Notification::info('Konfiguration erfolgreich gespeichert');
@@ -263,7 +301,61 @@ if (defined('VERSION_TYP') && !empty(VERSION_TYP)) {
         });
     })();
 
-    // ... existing code ...
+    $(function () {
+
+        $('#interfaceAddUser .select2-user-meta').select2({
+            placeholder: function () {
+                return $(this).data('placeholder');
+            },
+            allowClear: true,
+            width: '100%',
+            dropdownParent: $('#interfaceAddUser'),
+            tags: true,
+            createTag: function (params) {
+                const term = $.trim(params.term);
+
+                if (term === '') {
+                    return null;
+                }
+
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            },
+            insertTag: function (data, tag) {
+                data.push(tag);
+            }
+        });
+
+        $('#interfaceAddUser .select2-user-meta-multiple').select2({
+            placeholder: function () {
+                return $(this).data('placeholder');
+            },
+            width: '100%',
+            dropdownParent: $('#interfaceAddUser'),
+            tags: true,
+            multiple: true,
+            tokenSeparators: [','],
+            createTag: function (params) {
+                const term = $.trim(params.term);
+
+                if (term === '') {
+                    return null;
+                }
+
+                return {
+                    id: term,
+                    text: term,
+                    newTag: true
+                };
+            },
+            insertTag: function (data, tag) {
+                data.push(tag);
+            }
+        });
+    });
 </script>
 </body>
 </html>

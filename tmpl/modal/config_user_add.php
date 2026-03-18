@@ -36,16 +36,58 @@ $modal_ident = 'interfaceAddUser';
                                    id="newUser_pass"/>
                         </div>
                         <div class="form-group">
+                            <label class="col-form-label"
+                                   for="newUser_position">Position</label>
+                            <select class="form-select select2-user-meta select2-bootstrap-like"
+                                    name="newUser[position]"
+                                    id="newUser_position"
+                                    data-placeholder="Position auswählen oder neu eingeben">
+                                <option value=""></option>
+                                <?php
+                                if (!empty($arr_positionen)) {
+                                    foreach ($arr_positionen as $val) { ?>
+                                        <option value="<?php echo htmlspecialchars($val['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php echo htmlspecialchars($val['name'], ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="col-form-label"
+                                   for="newUser_group">Benutzergruppen</label>
+                            <select class="form-select select2-user-meta-multiple select2-bootstrap-like"
+                                    name="newUser[group][]"
+                                    id="newUser_group"
+                                    data-placeholder="Benutzergruppen auswählen oder neu eingeben"
+                                    multiple="multiple">
+                                <?php
+                                if (!empty($arr_benutzergruppen)) {
+                                    foreach ($arr_benutzergruppen as $val) { ?>
+                                        <option value="<?php echo htmlspecialchars($val['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php echo htmlspecialchars($val['name'], ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
+                                    <?php }
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label class="col-form-label" for="newUser_firma">Firmenzuordnung
                                 (optional)</label>
-                            <select class="form-select"
+                            <select class="form-select select2-user-meta select2-bootstrap-like"
                                     id="newUser_firma"
                                     name="newUser[firma]"
-                                    aria-label="Floating label select example">
+                                    data-placeholder="Firma auswählen oder neu eingeben"
+                                    aria-label="Firmenzuordnung auswählen oder neu eingeben">
+                                <option value=""></option>
                                 <?php
                                 if (!empty($arr_firmen) && !isset($arr_firmen['error'])) {
                                     foreach ($arr_firmen as $key => $val) { ?>
-                                        <option value="<?php echo $val['number'] ?>"><?php echo $val['name'] ?></option>
+                                        <option value="<?php echo htmlspecialchars($val['number'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php echo htmlspecialchars($val['name'], ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
                                     <?php }
                                 }
                                 ?>
@@ -54,14 +96,18 @@ $modal_ident = 'interfaceAddUser';
                         <div class="form-group">
                             <label class="col-form-label" for="newUser_filiale">Filialzuordnung
                                 (optional)</label>
-                            <select class="form-select"
+                            <select class="form-select select2-user-meta select2-bootstrap-like"
                                     id="newUser_filiale"
-                                    name=newUser[filiale]"
-                                    aria-label="Floating label select example">
+                                    name="newUser[filiale]"
+                                    data-placeholder="Filiale auswählen oder neu eingeben"
+                                    aria-label="Filialzuordnung auswählen oder neu eingeben">
+                                <option value=""></option>
                                 <?php
                                 if (!empty($arr_filialen) && !isset($arr_filialen['error'])) {
                                     foreach ($arr_filialen as $key => $val) { ?>
-                                        <option value="<?php echo $val['number'] ?>"><?php echo $val['name'] ?></option>
+                                        <option value="<?php echo htmlspecialchars($val['number'], ENT_QUOTES, 'UTF-8') ?>">
+                                            <?php echo htmlspecialchars($val['name'], ENT_QUOTES, 'UTF-8') ?>
+                                        </option>
                                     <?php }
                                 }
                                 ?>

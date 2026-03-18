@@ -118,11 +118,13 @@ class user
      * @param string      $password
      * @param null|string $mandant
      * @param null|string $filiale
+     * @param null|string $position
+     * @param null|string $benutzergruppe
      *
      * @return User
      * @throws DatabaseException
      */
-    public static function createUser($name, $password, $mandant = null, $filiale = null)
+    public static function createUser($name, $password, $mandant = null, $filiale = null, $position = null, $groups = null)
     {
         self::checkDatabaseTable();
         $exists = self::$dbConnection->rowExists(self::TABLE_NAME, ['name' => $name, 'mandant' => $mandant, 'filiale' => $filiale]);
@@ -131,7 +133,21 @@ class user
             error_log("Benutzer mit dieser Kombination aus name, mandant und filiale existiert bereits.");
             return false;
         } else {
-            $user = new self($name, $mandant, $filiale, 1);
+            $user = new self(
+                $name,
+                $mandant,
+                $filiale,
+                1,
+                null,
+                $password,
+                null,
+                null,
+                null,
+                null,
+                null,
+                $position,
+                $groups,
+            );
             $user->setPassword($password);
             $user->saveToDb();
             return $user;

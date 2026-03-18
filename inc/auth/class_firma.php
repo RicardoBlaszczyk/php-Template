@@ -39,6 +39,71 @@ class firma extends base
         return $result;
     }
 
+    public function resolveFirmaNumber($firmaValue, array &$arr_firmen): ?string
+    {
+        $firmaValue = trim((string)$firmaValue);
+        if ($firmaValue === '') {
+            return null;
+        }
+
+        foreach ($arr_firmen as $firma) {
+            if (!is_array($firma)) {
+                continue;
+            }
+
+            if (isset($firma['number']) && (string)$firma['number'] === $firmaValue) {
+                return (string)$firma['number'];
+            }
+        }
+
+        foreach ($arr_firmen as $firma) {
+            if (!is_array($firma) || empty($firma['name'])) {
+                continue;
+            }
+
+            if (mb_strtolower(trim((string)$firma['name'])) === mb_strtolower($firmaValue)) {
+                return (string)$firma['number'];
+            }
+        }
+
+        $obj_firma = new firma();
+        $newNumber = $this->nextMasterDataNumber($arr_firmen);
+
+        $obj_firma->set_vars([
+                                 'name'    => $firmaValue,
+                                 'number'  => $newNumber,
+                                 'account' => null,
+                             ]);
+        $obj_firma->insert();
+
+        $arr_firmen[$obj_firma->ID] = [
+            'ID'      => $obj_firma->ID,
+            'name'    => $firmaValue,
+            'number'  => $newNumber,
+            'account' => null,
+        ];
+
+        return $newNumber;
+    }
+
+    protected function nextMasterDataNumber(array $rows): string
+    {
+        $maxNumber = 0;
+
+        foreach ($rows as $row) {
+            if (!is_array($row) || empty($row['number'])) {
+                continue;
+            }
+
+            $number = trim((string)$row['number']);
+            if (ctype_digit($number)) {
+                $maxNumber = max($maxNumber, (int)$number);
+            }
+        }
+
+        return str_pad((string)($maxNumber + 1), 2, '0', STR_PAD_LEFT);
+    }
+
     protected function createDatabaseTable()
     {
         $fields = [
